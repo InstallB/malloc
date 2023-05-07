@@ -49,7 +49,7 @@
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 
-#define CATEGORY 16 // [0,K), should be even
+#define CATEGORY 20 // [0,K), should be even
 #define CATEGORY_MINSIZE(x) (1u << ((x) + 4)) // including 16B extra information
 #define CATEGORY_MAXSIZE(x) ((1u << ((x) + 5)) - 1)
 #define GET_CATEGORY(x) MIN(CATEGORY - 1,27 - __builtin_clz((x) + EXTRA)) // x should be unsigned int, x is **PAYLOAD** size, returns the category id x belongs to
@@ -70,8 +70,8 @@
 #define GET_ALLOC(p) ((GETVAL(p)) & (0x1)) // p is start of block (head), whether block is allocated
 
 // below are linklist operations
-#define SETPRE(p,v) SETVAL(((p) + SINGLEWORD),(v)) // p is start of block (head), v is delta value (unsigned int)
-#define SETNXT(p,v) SETVAL(((p) + DOUBLEWORD),(v)) // p is start of block (head), v is delta value (unsigned int)
+#define SETPRE(p,v) SETVAL((((unsigned char*)(p)) + SINGLEWORD),(v)) // p is start of block (head), v is delta value (unsigned int)
+#define SETNXT(p,v) SETVAL((((unsigned char*)(p)) + DOUBLEWORD),(v)) // p is start of block (head), v is delta value (unsigned int)
 
 void linklist_inserthead(int cat,unsigned char* p){ // p is beginnning of block
     // insert p to the head of cat-th linklist
@@ -152,15 +152,11 @@ void place_block(unsigned char* p,size_t size){ // p is start of BLOCK
     linklist_remove(block_cat,p);
     // dbg_printf("PLACE_BLOCK %lu %lu %p\n",size,block_size,p);
     assert(block_size >= size);
-    assert((block_size - size) % 16 == 0);
-
-    // if(block_size <= size + EXTRA) size = block_size;
 
     SETVAL(p,size | 1); // set head
     SETVAL(p + size + HEADER,size | 1); // set tail
 
     if(block_size > size){
-        assert(block_size >= size + EXTRA);
         unsigned char *q = p + size + EXTRA; // head of split block
         size_t split_size = block_size - size - EXTRA; // size of new splitted block (need to -EXTRA!!!)
         int split_cat = GET_CATEGORY(split_size);
@@ -216,11 +212,9 @@ unsigned char *first_fit(size_t size){
     int i,cat = GET_CATEGORY(size);
     for(i = cat;i < CATEGORY;i ++){
         unsigned char *p = GETP(GETVAL(LINKLIST_HEAD(i)));
-        if(p == NULL) continue;
-        while(1){
-            size_t siz = GETVAL(p),delta_nxt = GETVAL(p + DOUBLEWORD);
+        while(p != NULL){
+            size_t siz = GET_SIZE(p),delta_nxt = GETVAL(p + DOUBLEWORD);
             if(siz >= size) return p;
-            if(delta_nxt == 0) break;
             p = GETP(delta_nxt);
         }
     }
@@ -316,53 +310,53 @@ void *calloc (size_t nmemb, size_t size){
 /* I HATE MY LIFE. */
 void mm_checkheap(int verbose){
     verbose = verbose;
-    // // dbg_printf("CHECKHEAP %d:\n",verbose);
-    // int i;
-    // for(i = 0;i < CATEGORY;i ++){
-    //     // dbg_printf("CATEGORY %d [%u,%u) : ",i,CATEGORY_MINSIZE(i),CATEGORY_MAXSIZE(i));
-    //     unsigned char *p = LINKLIST_HEAD(i);
-    //     if(GETVAL(p) != 0){
-    //         p = GETP(GETVAL(p));
-    //         size_t las_p = 0;
-    //         while(1){
-    //             size_t delta_nxt = GETVAL(p + DOUBLEWORD);
-    //             size_t siz = GET_SIZE(p);
-    //             int alloc = GET_ALLOC(p);
-    //             // dbg_printf("(%p,%lu,%d) ",p,siz + EXTRA,alloc);
-    //             if(!(siz + EXTRA >= CATEGORY_MINSIZE(i) && siz + EXTRA <= CATEGORY_MAXSIZE(i))){
-    //                 dbg_printf("CATEGORY %d [%u,%u) : ",i,CATEGORY_MINSIZE(i),CATEGORY_MAXSIZE(i));
-    //                 dbg_printf("(%p,%lu,%d) ",p,siz + EXTRA,alloc);
-    //             }
-    //             assert(siz + EXTRA >= CATEGORY_MINSIZE(i) && siz + EXTRA <= CATEGORY_MAXSIZE(i));
-    //             assert(!alloc);
-    //             assert(GETVAL(p) == GETVAL(p + HEADER + siz));
-    //             assert(GETVAL(p + SINGLEWORD) == las_p);
-    //             if(delta_nxt == 0) break;
-    //             las_p = DELTA(p);
-    //             p = GETP(delta_nxt);
-    //         }
-    //     }
-    //     // dbg_printf("\n");
-    // }
-    // // dbg_printf("\n");
-    // unsigned char * p;
-    // int flg = 0,las = 1;
-    // p = (unsigned char*)(mem_heap_lo()) + 4 * CATEGORY + (!(CATEGORY & 1)) * SINGLEWORD;
-    // while(p < (unsigned char*)(mem_heap_hi())){
-    //     // dbg_printf("%p,%u,%u ",p,GET_SIZE(p),GET_ALLOC(p));
-    //     if(!las && !GET_ALLOC(p)){
-    //         dbg_printf("ERROR NOTMERGED : %d\n",verbose);
-    //         // assert(0);
-    //         flg = 1;
-    //     }
-    //     if(GET_SIZE(p) > 0 && GETVAL(p) != GETVAL(p + GET_SIZE(p) + HEADER)){
-    //         dbg_printf("ERROR HEADTAILNOTEQUAL : %d %u %u\n",verbose,GETVAL(p),GETVAL(p + GET_SIZE(p) + HEADER));
-    //         // assert(0);
-    //         flg = 1;
-    //     }
-    //     las = GET_ALLOC(p);
-    //     p += (GET_SIZE(p) + EXTRA);
-    // }
-    // if(flg) assert(0);
+    // dbg_printf("CHECKHEAP %d:\n",verbose);
+    int i;
+    for(i = 0;i < CATEGORY;i ++){
+        // dbg_printf("CATEGORY %d [%u,%u) : ",i,CATEGORY_MINSIZE(i),CATEGORY_MAXSIZE(i));
+        unsigned char *p = LINKLIST_HEAD(i);
+        if(GETVAL(p) != 0){
+            p = GETP(GETVAL(p));
+            size_t las_p = 0;
+            while(1){
+                size_t delta_nxt = GETVAL(p + DOUBLEWORD);
+                size_t siz = GET_SIZE(p);
+                int alloc = GET_ALLOC(p);
+                // dbg_printf("(%p,%lu,%d) ",p,siz + EXTRA,alloc);
+                if(!(siz + EXTRA >= CATEGORY_MINSIZE(i) && siz + EXTRA <= CATEGORY_MAXSIZE(i))){
+                    dbg_printf("CATEGORY %d [%u,%u) : ",i,CATEGORY_MINSIZE(i),CATEGORY_MAXSIZE(i));
+                    dbg_printf("(%p,%lu,%d) ",p,siz + EXTRA,alloc);
+                }
+                assert(siz + EXTRA >= CATEGORY_MINSIZE(i) && siz + EXTRA <= CATEGORY_MAXSIZE(i));
+                assert(!alloc);
+                assert(GETVAL(p) == GETVAL(p + HEADER + siz));
+                assert(GETVAL(p + SINGLEWORD) == las_p);
+                if(delta_nxt == 0) break;
+                las_p = DELTA(p);
+                p = GETP(delta_nxt);
+            }
+        }
+        // dbg_printf("\n");
+    }
+    // dbg_printf("\n");
+    unsigned char * p;
+    int flg = 0,las = 1;
+    p = (unsigned char*)(mem_heap_lo()) + 4 * CATEGORY + (!(CATEGORY & 1)) * SINGLEWORD;
+    while(p < (unsigned char*)(mem_heap_hi())){
+        // dbg_printf("%p,%u,%u ",p,GET_SIZE(p),GET_ALLOC(p));
+        if(!las && !GET_ALLOC(p)){
+            dbg_printf("ERROR NOTMERGED : %d\n",verbose);
+            // assert(0);
+            flg = 1;
+        }
+        if(GET_SIZE(p) > 0 && GETVAL(p) != GETVAL(p + GET_SIZE(p) + HEADER)){
+            dbg_printf("ERROR HEADTAILNOTEQUAL : %d %u %u\n",verbose,GETVAL(p),GETVAL(p + GET_SIZE(p) + HEADER));
+            // assert(0);
+            flg = 1;
+        }
+        las = GET_ALLOC(p);
+        p += (GET_SIZE(p) + EXTRA);
+    }
+    if(flg) assert(0);
     // dbg_printf("\n");
 }
