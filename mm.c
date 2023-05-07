@@ -114,12 +114,12 @@ void linklist_remove(int cat,unsigned char* p){ // p is beginnning of removed bl
 unsigned char* extend_heap(size_t size){
     unsigned char *p = mem_sbrk(size + EXTRA);
     if((long)p < 0) return NULL;
-    unsigned char *q = mem_heap_hi() - (SINGLEWORD - 1); // beginning of last '4B'
+    unsigned char *q = p + size + HEADER; // beginning of last '4B'
     // dbg_printf("extend %p %p %lu\n",p,q,size);
     SETVAL(q,0 | 1); // set new TAIL block
 
     SETVAL(p - SINGLEWORD,size | 1); // new block head
-    SETVAL(q - SINGLEWORD,size | 1); // new block tail
+    SETVAL(p - SINGLEWORD + size + HEADER,size | 1); // new block tail
     return p - SINGLEWORD;
 }
 
@@ -127,7 +127,7 @@ unsigned char* extend_heap(size_t size){
 unsigned char* extend_heap2(size_t size){
     unsigned char *p = mem_sbrk(MAX(CHUNKSIZE,size + EXTRA));
     if((long)p < 0) return NULL;
-    unsigned char *q = mem_heap_hi() - (SINGLEWORD - 1); // beginning of last '4B'
+    unsigned char *q = p + size + HEADER; // beginning of last '4B'
     // dbg_printf("extend %p %p %lu\n",p,q,size);
     SETVAL(q,0 | 1); // set new TAIL block
 
