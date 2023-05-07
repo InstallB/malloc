@@ -185,7 +185,8 @@ double ovhd()
 double mhz_full(int verbose, int sleeptime __attribute__((unused)))
 {
     double mhz = 2281.0;
-    if (verbose) 
+
+    if (verbose)
 	printf("Processor clock rate ~= %.1f MHz\n", mhz);
     return mhz;
 
