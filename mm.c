@@ -49,7 +49,7 @@
 #define MIN(x,y) ((x) < (y) ? (x) : (y))
 #define MAX(x,y) ((x) > (y) ? (x) : (y))
 
-#define CATEGORY 8 // [0,K), should be even
+#define CATEGORY 12 // [0,K), should be even
 #define CATEGORY_MINSIZE(x) (1u << ((x) + 4)) // including 16B extra information
 #define CATEGORY_MAXSIZE(x) ((1u << ((x) + 5)) - 1)
 #define GET_CATEGORY(x) MIN(CATEGORY - 1,27 - __builtin_clz((x) + EXTRA)) // x should be unsigned int, x is **PAYLOAD** size, returns the category id x belongs to
