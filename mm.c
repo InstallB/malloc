@@ -56,7 +56,7 @@
 
 #define LINKLIST_HEAD(x) (((unsigned char *)(mem_heap_lo())) + (4 * ((x) + 1))) // head of linklist of category x, returns unsigned char*
 #define DELTA(p) (((unsigned char *)(p)) - ((unsigned char *)(mem_heap_lo()))) // returns unsigned int
-#define GETP(delta) ((delta) ? (((unsigned char *)(mem_heap_lo())) + (delta)) : NULL) // returns unsigned char*, if delta==0 it returns NULL
+#define GETP(delta) ((delta == 0) ? (NULL) : (((unsigned char *)(mem_heap_lo())) + (delta))) // returns unsigned char*, if delta==0 it returns NULL
 
 #define SINGLEWORD 4
 #define DOUBLEWORD 8
@@ -81,7 +81,7 @@ void linklist_inserthead(int cat,unsigned char* p){ // p is beginnning of block
     SETNXT(p,0);
     if(delta_nxt != 0){
         unsigned char *q = GETP(delta_nxt);
-        SETNXT(p,DELTA(q));
+        SETNXT(p,delta_nxt);
         SETPRE(q,DELTA(p));
     }
     SETVAL(LINKLIST_HEAD(cat),DELTA(p));
@@ -230,6 +230,7 @@ unsigned char *first_fit(size_t size){
 int mm_init(void){
     unsigned char *q = mem_sbrk(SINGLEWORD); // used for alignment
     if((long)q < 0) return -1;
+    SETVAL(q,0);
 
     int i;
     for(i = 0;i < CATEGORY;i ++){
@@ -271,9 +272,7 @@ void *malloc(size_t size){
 }
 
 void free(void *ptr){
-
     // dbg_printf("FREE %p\n",ptr);
-
     if(ptr == NULL) return;
     size_t size = GET_SIZE(ptr - HEADER);
     SETVAL(ptr - HEADER,size | 0); // set head
